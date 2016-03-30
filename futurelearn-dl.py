@@ -451,7 +451,7 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
         downloadURLToFile(url, ofile, DOWNLOAD_TYPE)
 
         if DOWNLOAD_TYPE == 'vtt':
-            os.rename(ofile, prev_mp4_name.replace('.mp4', '.vtt'))
+            os.rename(ofile, prev_mp4_name.replace('.mp4', '.srt'))
 
 
 def getCourseWeekPage(course_id, week_id):
