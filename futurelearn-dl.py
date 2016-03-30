@@ -5,6 +5,8 @@ import requests
 import json
 import re
 import shutil
+from time import sleep
+from random import randint
 
 '''
     Author: Michael Bright, @mjbright
@@ -307,6 +309,10 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
 
             SRC_MATCH='<source src='
             mpos = content[pos:].lower().find(SRC_MATCH)
+            if content[pos-150:].lower().find('data-hd-src=') > 0:
+                isHD = True
+            else:
+                isHD = False
 
             # If there's no match, assume we reached the end of the content:
             if mpos == -1:
@@ -356,7 +362,10 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
 
         if DOWNLOAD_TYPE == 'mp4':
             debug(4, "MATCHING URL=<<{}>>".format(url))
-            url = url + '/hd'
+            url = url[:-5] + 'download'
+
+            if isHD:
+                url = url + '/hd'
             urls.append( url )
             downloadFile(url, download_dir, DOWNLOAD_TYPE)
         else:
@@ -383,17 +392,13 @@ def downloadURLToFile(url, file, DOWNLOAD_TYPE):
     debug(1, "Downloading url<{}> ...".format(url))
 
     # No user-agent: had some failures in this case when specifying user-agent ...
-    headers = {
-        'User-Agent': 'futurelearn-dl/0.01',
-        'Accept': 'application/json, text/javascript, */*; q=0.01',
-        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-        'X-Requested-With': 'XMLHttpRequest',
-    }
+    headers = { }
 
-    response = session.get(url, headers=headers, timeout=(5, 27))
-    if response.status_code != 200:
-        print("downloadURLToFile: Failed to download url <{}> => {}".format(url, response.status_code))
-        return
+    sleep(randint(10, 25))
+    response = session.get(url, headers=headers)
+    # if response.status_code != 200:
+    #     print("downloadURLToFile: Failed to download url <{}> => {}".format(url, response.status_code))
+    #     return
 
     #showResponse(response)
     debug(1, "type={}, content.len={}".format(DOWNLOAD_TYPE, len(response.content)))
@@ -419,7 +424,8 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
         #    'https://view.vzaar.com/2088434/video':
         
         # Let's strip of the /video at the end:
-        urlUptoNumber = url [ :url.rfind('/video') ]
+        print(url)
+        urlUptoNumber = url [ :url.find('/download') ]
 
         # Get the filename from the url after the last slash (where the number is):
         filename = course_id + '_' + urlUptoNumber[ urlUptoNumber.rfind('/') + 1: ] + ".mp4"
@@ -441,7 +447,7 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
 
         if DOWNLOAD_TYPE != 'vtt':
             file_num += 1
-        ofile= download_dir + '/' + "%02d" % file_num + '_' + filename
+        ofile = download_dir + '/' + "%02d" % file_num + '_' + filename
         downloadURLToFile(url, ofile, DOWNLOAD_TYPE)
 
         if DOWNLOAD_TYPE == 'vtt':
