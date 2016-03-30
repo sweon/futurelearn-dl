@@ -135,7 +135,7 @@ def writeFile(file, content):
     f.close()
 
 def saveItem(file, item, content):
-    ofile= TMP_DIR + '/' + file
+    ofile= FD_TMP_DIR + '/' + file
     debug(2, "Writing {} to <{}>".format(item, ofile))
     writeFile(ofile, content)
     return ofile
@@ -495,10 +495,11 @@ def getCoursePage(course_id):
 
 ## -- Main: --------------------------------------------------------
 
-TMP_DIR = os.getenv('TMP_DIR', default='/tmp/FUTURELEARN_DL')
+TMP_DIR = os.getenv('TMP_DIR', default='/tmp')
+FD_TMP_DIR = TMP_DIR + '/FUTURELEARN_DL'
 OP_DIR  = os.getenv('OP_DIR',  default='.')
 
-debug(2, "Using temp   dir <{}>".format(TMP_DIR))
+debug(2, "Using temp   dir <{}>".format(FD_TMP_DIR))
 debug(2, "Using Output dir <{}>".format(OP_DIR))
 
 email = sys.argv[1]
@@ -513,11 +514,11 @@ if len(sys.argv) == 6:
     WEEK_NUM = int(sys.argv[5])
 session = requests.Session()
 
-if os.path.exists(TMP_DIR):
-    shutil.rmtree(TMP_DIR)
-mkdir_p(TMP_DIR)
-if not os.path.isdir(TMP_DIR):
-    fatal("Failed to create tmp dir <{}>".format(TMP_DIR))
+if os.path.exists(FD_TMP_DIR):
+    shutil.rmtree(FD_TMP_DIR)
+mkdir_p(FD_TMP_DIR)
+if not os.path.isdir(FD_TMP_DIR):
+    fatal("Failed to create tmp dir <{}>".format(FD_TMP_DIR))
 
 debug(2, "Using e-mail={} password=***** course_id={}".format(email, course_id))
 
@@ -554,8 +555,8 @@ else:
     for step_id in steps:
         getCourseWeekStepPage(course_id, week_id, step_id, week_num)
 
-if os.path.exists(TMP_DIR):
-    shutil.rmtree(TMP_DIR)
+if os.path.exists(FD_TMP_DIR):
+    shutil.rmtree(FD_TMP_DIR)
 
 sys.exit(0)
 ################################################################################
