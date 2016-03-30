@@ -3,6 +3,8 @@
 import sys, os, errno
 import requests
 import json
+import re
+import shutil
 
 '''
     Author: Michael Bright, @mjbright
@@ -31,13 +33,16 @@ OVERWRITE_NONEMPTY_FILES=False
 WEEKS = []
 WEEK_NUM = -1 # Select all weeks unless specified on command-line
 
+file_num = 0
+prev_mp4_name = ''
+
 # Download file types by extension (case insensitive):
 #DOWNLOAD_TYPES = [ 'pdf', 'mp4', 'mp3', 'doc', 'docx', 'ppt', 'pptx', 'wmv' ]
 #DOWNLOAD_TYPES = [ 'pdf', 'mp4' ]
 #DOWNLOAD_TYPES = [ 'pdf' ]
 #DOWNLOAD_TYPES = [ 'mp4' ]
 #DOWNLOAD_TYPES = [ 'pdf', 'mp4', 'mp3', 'ppt', 'pptx', 'wmv' ]
-DOWNLOAD_TYPES = [ 'pdf', 'mp4' ]
+DOWNLOAD_TYPES = [ 'pdf', 'mp4', 'vtt' ]
 for d in range(len(DOWNLOAD_TYPES)):
     DOWNLOAD_TYPES[d] = DOWNLOAD_TYPES[d].lower()
     
@@ -224,7 +229,6 @@ def getCourseWeekStepPage(course_id, week_id, step_id, week_num):
         debug(4, "Searching for '{}' files in {}".format(DOWNLOAD_TYPE, ofile))
         URLS[DOWNLOAD_TYPE] = \
             getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD_TYPE)
-
         num_urls += len(URLS[DOWNLOAD_TYPE])
 
     if num_urls > 0 and DEBUG and VERBOSE > 2:
@@ -267,6 +271,8 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
     if DOWNLOAD_TYPE == 'mp4':
         POS_MATCH='<video'
         MEDIA_MATCH='video/mp4'
+    elif DOWNLOAD_TYPE == 'vtt':
+        POS_MATCH = '<div class="track" data-src='
 
     # If there's no mention of such media in the whole file, leave now:
     if not MEDIA_MATCH in content.lower():
@@ -282,6 +288,7 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
     debug(4, "getDownloadableURLs({}..., {})".format(content[:10], DOWNLOAD_TYPE))
 
     pos = 0
+
     while POS_MATCH in content.lower():
         mpos = content[pos:].lower().find(POS_MATCH)
         if mpos == -1:
@@ -345,10 +352,11 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
         urls_seen.append(url)
         lurl = url.lower()
 
-        download_dir = OP_DIR + '/' + course_id + '/week' + str(week_num)
+        download_dir = OP_DIR + '/' + course_id + '/Week_' + "%02d" % week_num
 
         if DOWNLOAD_TYPE == 'mp4':
             debug(4, "MATCHING URL=<<{}>>".format(url))
+            url = url + '/hd'
             urls.append( url )
             downloadFile(url, download_dir, DOWNLOAD_TYPE)
         else:
@@ -356,6 +364,11 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
             if lurl[-(1+len(DOWNLOAD_TYPE)):] == "." + DOWNLOAD_TYPE:
                 debug(4, "MATCHING URL=<<{}>>".format(url))
                 urls.append( url )
+                downloadFile(url, download_dir, DOWNLOAD_TYPE)
+            elif lurl[-(1 + len(DOWNLOAD_TYPE) + 15):-15] == "." + DOWNLOAD_TYPE:
+                debug(4, "MATCHING URL=<<{}>>".format(url))
+                url = url[:-15]
+                urls.append(url)
                 downloadFile(url, download_dir, DOWNLOAD_TYPE)
 
     return urls
@@ -370,8 +383,14 @@ def downloadURLToFile(url, file, DOWNLOAD_TYPE):
     debug(1, "Downloading url<{}> ...".format(url))
 
     # No user-agent: had some failures in this case when specifying user-agent ...
-    headers = {}
-    response = session.get(url, headers=headers)
+    headers = {
+        'User-Agent': 'futurelearn-dl/0.01',
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+        'X-Requested-With': 'XMLHttpRequest',
+    }
+
+    response = session.get(url, headers=headers, timeout=(5, 27))
     if response.status_code != 200:
         print("downloadURLToFile: Failed to download url <{}> => {}".format(url, response.status_code))
         return
@@ -383,6 +402,7 @@ def downloadURLToFile(url, file, DOWNLOAD_TYPE):
         return
         
     debug(2, "Writing content to <{}>".format(file))
+
     writeBinaryFile(file, response.content)
     #fatal("STOP")
 
@@ -390,8 +410,9 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
     if not DOWNLOAD:
         return
 
+    global file_num
+
     mkdir_p(download_dir)
-    
 
     if DOWNLOAD_TYPE == 'mp4':
         # We need to create an 'x.mp4' filename from the url of the form
@@ -403,7 +424,10 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
         # Get the filename from the url after the last slash (where the number is):
         filename = course_id + '_' + urlUptoNumber[ urlUptoNumber.rfind('/') + 1: ] + ".mp4"
 
-        ofile= download_dir + '/' + filename
+        file_num += 1
+        ofile= download_dir + '/' + "%02d" % file_num + '_' + filename
+        global prev_mp4_name
+        prev_mp4_name = ofile
         downloadURLToFile(url, ofile, DOWNLOAD_TYPE)
     else:
         # Get the filename from the url after the last slash (where the source filename is):
@@ -415,8 +439,13 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
         if '%' in filename:
             fatal("downloadFile: Unhandled escape sequence in filename <{}>".format(filename))
 
-        ofile= download_dir + '/' + filename
+        if DOWNLOAD_TYPE != 'vtt':
+            file_num += 1
+        ofile= download_dir + '/' + "%02d" % file_num + '_' + filename
         downloadURLToFile(url, ofile, DOWNLOAD_TYPE)
+
+        if DOWNLOAD_TYPE == 'vtt':
+            os.rename(ofile, prev_mp4_name.replace('.mp4', '.vtt'))
 
 
 def getCourseWeekPage(course_id, week_id):
@@ -433,37 +462,9 @@ def getCourseWeekPage(course_id, week_id):
                    "'course week {} page'".format(week_id),
                    content)
 
-    ## -- Now loop through identifying steps:
+    regc = re.compile(r"\/steps\/(.*)\"\>\<span\>")
 
-    ## TODO: Make this page parsing more robust: should be using regexes:
-    ## TODO: Make this page parsing more robust: should be checking 'list steps' is part of the '<ol'
-    pos = content.find('<ol class=')
-    current = content[pos:]
-    pos = current.find('list steps')
-    current = current[pos:]
-
-    steps_seen=[]
-
-    pos=0
-    MATCH='/steps/'
-    while MATCH in current:
-        pos += current[pos:].find(MATCH)
-        info = current[ pos-10 : pos + 20 ]
-    
-        debug(4, "INFO=" + info)
-
-        ipos = pos + len(MATCH)
-        stepid = getInteger(current, ipos)
-        current = current[pos+6:]
-   
-        if not stepid in steps_seen and not stepid == '':
-            steps_seen.append(stepid)
-            debug(4, "STEPID=" + stepid)
-
-        # Step over current '/steps/':
-        pos += len(MATCH)
-
-    return steps_seen
+    return regc.findall(content)
 
 def getCoursePage(course_id):
     '''
@@ -473,8 +474,6 @@ def getCoursePage(course_id):
        RETURNS: the list of steps in order
     '''
 
-    weeks_seen=[]
-
     response = session.get(COURSE_URL, headers=headers)
     #showResponse(response)
     content = response.content.decode('utf8')
@@ -482,34 +481,16 @@ def getCoursePage(course_id):
     saveDebugItem( 'course.' + course_id + '.response.content', "'course page'", content)
 
     ## TODO: Make this page parsing more robust: should be checking /todo/ is part of an "<a href"
-    ## -- Now loop through identifying weekids: ../todo/<WEEKID>
-    pos=0
-    MATCH='/todo/'
-    while MATCH in content[pos:]:
-        pos += content[pos:].find(MATCH)
-        info = content[ pos : pos + 20 ]
-        # integer weekid starts here:
-        ipos = pos + len(MATCH)
 
-        weekid = getInteger(content, ipos)
+    regc = re.compile(r"\/todo\/(.*)\"\>\<div")
 
-        if not weekid in weeks_seen and not weekid == '':
-            weeks_seen.append(weekid)
-            debug(4,"WEEKID=" + weekid)
-
-        # Step over current '/todo/':
-        pos += len(MATCH)
-
-    if (len(weeks_seen) <= 0):
-        fatal("getCoursePage: No week entries found - check your courseid and the courserun")
-
-    return weeks_seen
+    return regc.findall(content)
 
 
 ## -- Main: --------------------------------------------------------
 
 TMP_DIR = os.getenv('TMP_DIR', default='/tmp/FUTURELEARN_DL')
-OP_DIR  = os.getenv('OP_DIR',  default=os.getenv('HOME') + '/Education/FUTURELEARN')
+OP_DIR  = os.getenv('OP_DIR',  default='.')
 
 debug(2, "Using temp   dir <{}>".format(TMP_DIR))
 debug(2, "Using Output dir <{}>".format(OP_DIR))
@@ -526,6 +507,8 @@ if len(sys.argv) == 6:
     WEEK_NUM = int(sys.argv[5])
 session = requests.Session()
 
+if os.path.exists(TMP_DIR):
+    shutil.rmtree(TMP_DIR)
 mkdir_p(TMP_DIR)
 if not os.path.isdir(TMP_DIR):
     fatal("Failed to create tmp dir <{}>".format(TMP_DIR))
@@ -543,11 +526,13 @@ debug(1, "Downloading {}-week course '{}'".format(len(WEEKS), course_id))
 if WEEK_NUM == -1: # All
     debug(2, "Downloading all weeks - if available")
     week_num=0
+
     for week_id in WEEKS:
         week_num += 1
         debug(2, "Downloading available week{} material".format(week_num))
         steps = getCourseWeekPage(course_id, week_id)
         debug(2, "STEPS=" + str(steps))
+        file_num = 0
         for step_id in steps:
             getCourseWeekStepPage(course_id, week_id, step_id, week_num)
 else:
@@ -559,8 +544,12 @@ else:
     week_id = WEEKS[week_num-1]
     debug(1, "Downloading available week{} material".format(week_num))
     steps = getCourseWeekPage(course_id, week_id)
+    file_num = 0
     for step_id in steps:
         getCourseWeekStepPage(course_id, week_id, step_id, week_num)
+
+if os.path.exists(TMP_DIR):
+    shutil.rmtree(TMP_DIR)
 
 sys.exit(0)
 ################################################################################
