@@ -472,7 +472,7 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
 
             vttfile.close()
             srtfile.close()
-            os.remove(vttfile)
+            os.remove(ofile)
 
 def getCourseWeekPage(course_id, week_id):
 
