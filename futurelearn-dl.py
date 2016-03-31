@@ -451,8 +451,28 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
         downloadURLToFile(url, ofile, DOWNLOAD_TYPE)
 
         if DOWNLOAD_TYPE == 'vtt':
-            os.rename(ofile, prev_mp4_name.replace('.mp4', '.srt'))
+            vttfile = open(ofile, 'r')
+            srtfile = open(prev_mp4_name.replace('.mp4', '.srt'), 'w')
+            regc = re.compile(r"(\d{2}:\d{2}:\d{2})\.(\d{3}\s+)-->(\s+\d{2}:\d{2}:\d{2})\.(\d{3}\s*)")
 
+            linenum = 1
+            timeline = False
+            for line in vttfile:
+                match = re.search(regc, line)
+                if match or timeline:
+                    if not timeline:
+                        srtfile.write("%d\n" % linenum)
+                        linenum += 1
+                    timeline = True
+                    if match:
+                        line = match.group(1) + ',' + match.group(2) + '-->' + match.group(3) + ',' + match.group(4) + '\n'
+                    if len(line.strip()) == 0:
+                        timeline = False
+                    srtfile.write(line)
+
+            vttfile.close()
+            srtfile.close()
+            os.remove(ofile)
 
 def getCourseWeekPage(course_id, week_id):
 
