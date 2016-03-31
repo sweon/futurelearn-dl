@@ -465,14 +465,14 @@ def downloadFile(url, download_dir, DOWNLOAD_TYPE):
                         linenum += 1
                     timeline = True
                     if match:
-                        line = match.group(1) + ',' + match.group(2) + '-->' + match.group(3) + ',' + match.group(4) + '\n'
+                        line = match.group(1) + ',' + match.group(2) + '-->' + match.group(3) + ',' + match.group(4).strip() + '\n'
                     if len(line.strip()) == 0:
                         timeline = False
                     srtfile.write(line)
 
             vttfile.close()
             srtfile.close()
-            os.remove(ofile)
+            os.remove(vttfile)
 
 def getCourseWeekPage(course_id, week_id):
 
