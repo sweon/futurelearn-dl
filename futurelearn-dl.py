@@ -292,6 +292,14 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
     pos = 0
 
     while POS_MATCH in content.lower():
+
+        if DOWNLOAD_TYPE == 'vtt':
+            SRCLANG = 'data-srclang='
+            langpos = content[pos:].lower().find(SRCLANG)
+            if langpos != -1:
+                if content[langpos+len(SRCLANG)+1:langpos+len(SRCLANG)+3].lower() != 'en':
+                    break
+                
         mpos = content[pos:].lower().find(POS_MATCH)
         if mpos == -1:
             #if len(urls) != 0:
