@@ -333,6 +333,7 @@ def getDownloadableURLs(course_id, week_id, step_id, week_num, content, DOWNLOAD
             debug(4, "HREF ==> <<{}...>>".format(content[pos:pos+400]))
             pos += len(POS_MATCH)
 
+        content = content.replace('\\"', '"')
         quote = content[pos]
         if quote != "'" and quote != '"':
             fatal("No quote(char={}) in <<{}...>>".format(quote, content[pos-10:pos+10]))
